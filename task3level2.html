@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pro To-Do App</title>
+  <style>
+    /* Core & glass theme reset */
+    *{margin:0;padding:0;box-sizing:border-box;font-family:Poppins, sans-serif;}
+    body{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;min-height:100vh;display:flex;justify-content:center;padding:40px 20px;}
+    .container{width:100%;max-width:1100px;background:rgba(255,255,255,0.08);backdrop-filter:blur(15px);border-radius:20px;padding:40px;box-shadow:0 8px 30px rgba(0,0,0,0.5);}
+    h1{text-align:center;color:#00fff5;margin-bottom:10px;}
+    .quote{text-align:center;font-style:italic;margin-bottom:20px;color:#ddd;}
+    /* input area */
+    .task-input{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;}
+    .task-input input, .task-input select{padding:12px;border:none;border-radius:10px;outline:none;font-size:1rem;}
+    .task-input input[type=date]{min-width:140px;}
+    .task-input button{padding:12px 20px;border:none;border-radius:10px;background:#00fff5;color:#000;cursor:pointer;transition:0.3s;}
+    .task-input button:hover{background:#00e6e0;transform:scale(1.05);}
+    /* filters */
+    .filters{display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap;}
+    .filters button{padding:8px 12px;border:none;border-radius:8px;background:rgba(255,255,255,0.1);cursor:pointer;transition:0.3s;}
+    .filters button.active, .filters button:hover{background:#00fff5;color:#000;}
+    /* subtasks */
+    .subtasks{margin-left:20px;margin-top:8px;}
+    .subtasks input{padding:6px;border-radius:6px;border:none;outline:none;font-size:0.9rem;width:200px;}
+    .subtasks button{padding:6px 10px;border:none;border-radius:6px;background:#00fff5;color:#000;margin-left:6px;}
+    /* list views */
+    .views{display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
+    .views button{padding:6px 10px;border:none;border-radius:6px;background:rgba(255,255,255,0.1);cursor:pointer;}
+    .views button.active{background:#00fff5;color:#000;}
+    /* tasks list & calendar */
+    ul, .calendar{background:rgba(255,255,255,0.12);border-radius:10px;padding:20px;}
+    ul li{padding:12px;display:flex;justify-content:space-between;align-items:center;border-radius:8px;margin-bottom:10px;}
+    .completed{opacity:0.6;text-decoration:line-through;}
+    .task-meta{font-size:0.8rem;color:#ccc;}
+    .btn-group button{margin-left:6px;padding:6px 10px;border:none;border-radius:6px;cursor:pointer;}
+    .complete-btn{background:#28a745;color:#fff;}
+    .delete-btn{background:#dc3545;color:#fff;}
+    /* stats */
+    .stats{display:flex;justify-content:space-around;flex-wrap:wrap;margin-top:20px;}
+    .stat{background:rgba(255,255,255,0.1);padding:10px 20px;border-radius:12px;flex:1;margin:10px;min-width:120px;text-align:center;}
+    .stat h3{color:#00fff5;margin-bottom:4px;}
+    /* notifications hack */
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pro To-Do App</h1>
+    <p class="quote">“Focus on progress, not perfection.”</p>
+    <div class="task-input">
+      <input id="taskInput" type="text" placeholder="New task...">
+      <input id="dueDate" type="date">
+      <select id="priority"><option>Low</option><option>Medium</option><option>High</option></select>
+      <button onclick="addTask()">Add</button>
+    </div>
+    <div class="filters">
+      <button onclick="applyFilter('all')" class="active">All</button>
+      <button onclick="applyFilter('pending')">Pending</button>
+      <button onclick="applyFilter('completed')">Completed</button>
+      <button onclick="applyFilter('high')">High Priority</button>
+    </div>
+    <div class="views">
+      <button onclick="setView('list')" class="active">List View</button>
+      <button onclick="setView('calendar')">Calendar View</button>
+    </div>
+    <ul id="taskList"></ul>
+    <div id="calendar" class="calendar" style="display:none;">Calendar view coming soon...</div>
+    <div class="stats">
+      <div class="stat"><h3 id="totalTasks">0</h3>Total</div>
+      <div class="stat"><h3 id="completedTasks">0</h3>Completed</div>
+      <div class="stat"><h3 id="pendingTasks">0</h3>Pending</div>
+    </div>
+    <button onclick="clearAll()" style="margin:20px auto;display:block;padding:10px 20px;border:none;border-radius:8px;background:#ff4c4c;color:#fff;">Clear All</button>
+  </div>
+
+  <script>
+    let tasks = JSON.parse(localStorage.getItem("tasks"))||[];
+    const tInput = document.getElementById("taskInput"), dInput = document.getElementById("dueDate"), pr = document.getElementById("priority");
+    const tList = document.getElementById("taskList"), cal = document.getElementById("calendar");
+    const tot = document.getElementById("totalTasks"), comp = document.getElementById("completedTasks"), pend = document.getElementById("pendingTasks");
+    let currentView = 'list', filter='all';
+
+    function save(){ localStorage.setItem("tasks", JSON.stringify(tasks)); }
+    function stats(){ tot.innerText = tasks.length; comp.innerText = tasks.filter(t=>t.completed).length; pend.innerText = tasks.filter(t=>!t.completed).length; }
+
+    function render(){
+      tList.innerHTML = '';
+      tasks.forEach((t,i)=>{
+        if(filter==='pending'&&t.completed) return;
+        if(filter==='completed'&&!t.completed) return;
+        if(filter==='high'&&t.priority!=='High') return;
+        const li = document.createElement('li');
+        if(t.completed) li.classList.add('completed');
+        li.innerHTML = `
+          <div><strong>${t.text}</strong> <span class="task-meta">Added: ${t.added} | Due: ${t.due||'None'} | <em>${t.priority}</em></span></div>
+          <div class="btn-group">
+            <button class="complete-btn" onclick="toggleComplete(${i})">✓</button>
+            <button class="delete-btn" onclick="deleteTask(${i})">✕</button>
+          </div>`;
+        tList.appendChild(li);
+      });
+      stats();
+    }
+
+    function addTask(){
+      if(!tInput.value.trim()) return alert("Enter task");
+      tasks.push({text:tInput.value,added:new Date().toLocaleString(),due:dInput.value,priority:pr.value,completed:false});
+      save(); render();
+      tInput.value=''; dInput.value=''; pr.value='Low';
+    }
+
+    function toggleComplete(i){ tasks[i].completed=!tasks[i].completed; save(); render(); }
+    function deleteTask(i){ tasks.splice(i,1); save(); render(); }
+    function applyFilter(f){ filter=f; document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active')); event.target.classList.add('active'); render(); }
+    function setView(v){ currentView=v; document.querySelectorAll('.views button').forEach(b=>b.classList.toggle('active',b.innerText.includes(v))); tList.style.display=v==='list'?'block':'none'; cal.style.display=v==='calendar'?'block':'none'; }
+    function clearAll(){ if(confirm("Clear all tasks?")){tasks=[];save();render()}}
+
+    // init
+    render();
+  </script>
+</body>
+</html>
